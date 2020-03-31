@@ -1,0 +1,137 @@
+/** the following elements are being used in these pins:
+- mp3 shield - 13/12/11/7/6/4/3
+- load cell - 5/2
+- piezo discs - a0/a1
+- button - 8
+- led rings - 10/9 **/
+
+// 1. Mp3shield
+#include <SPI.h>
+#include <Adafruit_VS1053.h>
+#include <SD.h>
+
+#define CLK 13       // SPI Clock, shared with SD card
+#define MISO 12      // Input data, from VS1053/SD card
+#define MOSI 11      // Output data, to VS1053/SD card
+// Connect CLK, MISO and MOSI to hardware SPI pins. 
+// See http://arduino.cc/en/Reference/SPI "Connections"
+
+// These are the pins used for the breakout example
+#define BREAKOUT_RESET  9      // VS1053 reset pin (output)
+#define BREAKOUT_CS     10     // VS1053 chip select pin (output)
+#define BREAKOUT_DCS    8      // VS1053 Data/command select pin (output)
+// These are the pins used for the music maker shield
+#define SHIELD_RESET  -1      // VS1053 reset pin (unused!)
+#define SHIELD_CS     7      // VS1053 chip select pin (output)
+#define SHIELD_DCS    6      // VS1053 Data/command select pin (output)
+
+// These are common pins between breakout and shield
+#define CARDCS 4     // Card chip select pin
+// DREQ should be an Int pin, see http://arduino.cc/en/Reference/attachInterrupt
+#define DREQ 3       // VS1053 Data request, ideally an Interrupt pin
+
+Adafruit_VS1053_FilePlayer musicPlayer = 
+  Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, CARDCS);
+
+//2. loadcell
+//#include "HX711.h"
+//#define calibration_factor -10830.00 //This value is obtained using the SparkFun_HX711_Calibration sketch
+//#define DOUT  5
+//#define WGT  2
+//HX711 scale;
+//float reading = 0.0;
+
+//3. piezodisc
+#define DRUM1 0 //piezo disc 1 - a0
+//#define DRUM1 1 // piezo disc 2 - a1
+byte val = 0;      // Initializing the variable for the voltage value
+bool cup1 = false;
+bool cup2 = false;
+
+//4. button
+const int buttonPin = 8;     // the number of the pushbutton pin
+int buttonState = 0; 
+
+//5. ledring light
+#include <Adafruit_NeoPixel.h>
+#define PIN       10
+#define NUMPIXELS 32 
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+#define DELAYVAL 30
+
+//variables
+
+bool cleanuptime = false;
+
+void setup() { // put your setup code here, to run once:
+
+//button
+  pinMode(buttonPin, INPUT);
+
+//music
+  Serial.begin(9600);
+  Serial.println("Adafruit VS1053 Simple Test");
+
+  if (! musicPlayer.begin()) { // initialise the music player
+     Serial.println(F("Couldn't find VS1053, do you have the right pins defined?"));
+     while (1);
+  }
+  Serial.println(F("VS1053 found"));
+  
+   if (!SD.begin(CARDCS)) {
+    Serial.println(F("SD failed, or not present"));
+    while (1);  // don't do anything more
+  }
+
+  // Set volume for left, right channels. lower numbers == louder volume!
+  musicPlayer.setVolume(50,50);
+
+  if (! musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT));
+      pixels.begin();
+}
+
+void loop() { // put your main code here, to run repeatedly:
+buttonState = digitalRead(buttonPin);
+//val = analogRead(DRUM1); 
+//Serial.print(reading);
+    
+  //button
+  if ((buttonState == HIGH) && (cleanuptime == false)) {
+      cleanuptime = true;
+  }
+  
+      
+  if (cleanuptime == true) {
+      Serial.println(F("button on"));
+       if (! musicPlayer.startPlayingFile("cleanup.mp3")) {
+           Serial.println("Could not open file track001.mp3");
+             while (1);
+          }
+        Serial.println("Started playing");
+
+        while (musicPlayer.playingMusic) {
+        // file is now playing in the 'background' so now's a good time
+        // to do something else like handling LEDs or buttons :)
+        val = analogRead(DRUM1);
+        Serial.println(val, DEC);
+          if (val >= 5){
+              cup1 = true;
+      }
+        if (cup1 == true){
+          pixels.clear();
+          for(int i=0; i<NUMPIXELS; i++) { // For each pixel...
+            pixels.setPixelColor(i, pixels.Color(100, 150, 80));
+            pixels.show();
+            delay(DELAYVAL);
+              }
+           cup1 = false;
+              }
+      if (cup1 == false){
+         val = 0;
+         pixels.setPixelColor(0,0);
+      }
+        delay(100);
+     }
+           
+  }  
+}
